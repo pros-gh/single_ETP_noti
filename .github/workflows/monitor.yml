@@ -10,9 +10,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -20,6 +17,11 @@ jobs:
 
       - name: Install dependencies
         run: pip install requests
+
+      - name: Download scripts
+        run: |
+          curl -fsSL "https://raw.githubusercontent.com/pros-gh/single_ETP_noti/main/etf_etn_monitor.py" -o etf_etn_monitor.py
+          curl -fsSL "https://raw.githubusercontent.com/pros-gh/single_ETP_noti/main/make_config.py" -o make_config.py
 
       - name: Generate config.json
         env:
