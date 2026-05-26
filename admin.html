@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#1a3c6e">
+  <title>ETF/ETN 모니터링</title>
+  <style>
+    :root {
+      --primary:#1a3c6e; --primary-l:#2a5298; --primary-xl:#3d6db5;
+      --accent:#2563eb; --accent-l:#dbeafe;
+      --green:#10b981; --green-l:#d1fae5;
+      --red:#ef4444; --red-l:#fee2e2;
+      --orange:#f59e0b; --orange-l:#fef3c7;
+      --bg:#f1f5f9; --card:#fff; --text:#0f172a; --muted:#64748b;
+      --border:#e2e8f0; --shadow:0 1px 8px rgba(0,0,0,.08);
+      --r:14px; --tr:.18s ease;
+    }
+    @media(prefers-color-scheme:dark){
+      :root{--bg:#0f172a;--card:#1e293b;--text:#f1f5f9;--muted:#94a3b8;--border:#334155;--accent-l:#1e3a5f;--green-l:#064e3b;--red-l:#7f1d1d;--orange-l:#451a03;}
+      input,select,textarea{background:#0f172a!important;color:#f1f5f9!important;}
+      .platform-tab.active{background:#0f172a;}
+    }
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Malgun Gothic',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:48px;}
+
+    /* HEADER */
+    .hdr{background:linear-gradient(135deg,var(--primary) 0%,var(--primary-l) 100%);padding:52px 20px 22px;position:sticky;top:0;z-index:200;box-shadow:0 2px 16px rgba(26,60,110,.35);}
+    .hdr-in{max-width:520px;margin:0 auto;display:flex;justify-content:space-between;align-items:flex-end;}
+    .hdr-text h1{color:#fff;font-size:20px;font-weight:700;}
+    .hdr-text p{color:rgba(255,255,255,.6);font-size:12px;margin-top:3px;}
+
+    /* AUTO TOGGLE */
+    .auto-pill{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);border-radius:24px;padding:6px 12px 6px 8px;cursor:pointer;user-select:none;transition:background var(--tr);}
+    .auto-pill:hover{background:rgba(255,255,255,.2);}
+    .auto-pill-label{color:#fff;font-size:13px;font-weight:600;}
+    .toggle-track{width:42px;height:24px;border-radius:12px;background:rgba(255,255,255,.25);position:relative;transition:background var(--tr);}
+    .toggle-track.on{background:var(--green);}
+    .toggle-thumb{width:18px;height:18px;border-radius:50%;background:#fff;position:absolute;top:3px;left:3px;transition:transform var(--tr);box-shadow:0 1px 4px rgba(0,0,0,.25);}
+    .toggle-track.on .toggle-thumb{transform:translateX(18px);}
+
+    /* CONTAINER */
+    .wrap{max-width:520px;margin:0 auto;padding:16px 14px 0;}
+
+    /* STATUS CARD */
+    .status-card{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);border:1px solid var(--border);padding:16px;margin-bottom:12px;display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+    .st-item{display:flex;flex-direction:column;gap:3px;}
+    .st-label{font-size:10px;font-weight:700;letter-spacing:.5px;color:var(--muted);text-transform:uppercase;}
+    .st-val{font-size:14px;font-weight:600;color:var(--text);}
+    .st-val.ok{color:var(--green);}
+    .st-val.warn{color:var(--orange);}
+    .st-val.err{color:var(--red);}
+    .st-val.dim{color:var(--muted);}
+    .run-now-btn{grid-column:1/-1;padding:11px;border:none;border-radius:10px;background:var(--accent-l);color:var(--accent);font-size:14px;font-weight:700;cursor:pointer;transition:background var(--tr);display:flex;align-items:center;justify-content:center;gap:6px;}
+    .run-now-btn:hover{background:#bfdbfe;}
+    .run-now-btn:disabled{opacity:.5;cursor:not-allowed;}
+
+    /* BANNER */
+    .banner{display:none;align-items:center;gap:10px;padding:12px 14px;border-radius:var(--r);margin-bottom:10px;font-size:13px;font-weight:500;animation:si .25s ease;}
+    .banner.show{display:flex;}
+    .banner.ok{background:var(--green-l);color:#065f46;border:1px solid #6ee7b7;}
+    .banner.err{background:var(--red-l);color:#991b1b;border:1px solid #fca5a5;}
+    .banner.info{background:var(--accent-l);color:#1e40af;border:1px solid #93c5fd;}
+    @keyframes si{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+
+    /* CARD */
+    .card{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);border:1px solid var(--border);padding:18px;margin-bottom:12px;}
+    .card-title{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--muted);text-transform:uppercase;margin-bottom:14px;}
+    .card-title .ico{width:26px;height:26px;background:var(--accent-l);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;}
+
+    /* PERIOD RADIO */
+    .period-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;}
+    .period-opt{position:relative;}
+    .period-opt input{position:absolute;opacity:0;width:0;height:0;}
+    .period-opt label{display:flex;flex-direction:column;gap:2px;padding:12px;border:2px solid var(--border);border-radius:10px;cursor:pointer;transition:all var(--tr);}
+    .period-opt input:checked + label{border-color:var(--accent);background:var(--accent-l);}
+    .period-opt-title{font-size:13px;font-weight:700;color:var(--text);}
+    .period-opt-sub{font-size:10px;color:var(--muted);}
+    .period-opt input:checked + label .period-opt-title{color:var(--accent);}
+    .period-opt input:checked + label .period-opt-sub{color:#3b82f6;}
+
+    .custom-range{display:none;gap:10px;align-items:center;margin-top:8px;}
+    .custom-range.show{display:flex;}
+    .custom-range input[type="date"]{flex:1;padding:10px 12px;border:1.5px solid var(--border);border-radius:9px;font-size:14px;font-family:inherit;color:var(--text);outline:none;transition:border-color var(--tr);}
+    .custom-range input[type="date"]:focus{border-color:var(--accent);}
+    .custom-range span{font-size:14px;color:var(--muted);white-space:nowrap;}
+
+    /* INPUTS */
+    .field{margin-bottom:12px;}
+    .field:last-child{margin-bottom:0;}
+    .field-label{font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px;display:block;}
+    .field-hint{font-size:11px;color:var(--muted);margin-top:4px;}
+    input[type=text],input[type=email],input[type=time],select{width:100%;padding:12px 13px;border:1.5px solid var(--border);border-radius:9px;font-size:14px;font-family:inherit;color:var(--text);background:var(--card);outline:none;transition:border-color var(--tr),box-shadow var(--tr);-webkit-appearance:none;}
+    input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,.1);}
+    input::placeholder{color:#bbb;}
+
+    /* RECIPIENTS */
+    .rec-list{display:flex;flex-direction:column;gap:7px;}
+    .rec-item{display:flex;gap:7px;align-items:center;animation:si .2s ease;}
+    .rec-item input{flex:1;}
+    .btn-rm{width:36px;height:36px;flex-shrink:0;border:none;border-radius:8px;background:var(--red-l);color:var(--red);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+    .btn-add{width:100%;padding:10px;border:1.5px dashed var(--border);border-radius:9px;background:transparent;color:var(--accent);font-size:13px;font-weight:600;cursor:pointer;margin-top:7px;display:flex;align-items:center;justify-content:center;gap:5px;transition:background var(--tr);}
+    .btn-add:hover{background:var(--accent-l);}
+
+    /* PLATFORM TABS */
+    .ptabs{display:flex;gap:0;background:var(--bg);border-radius:10px;padding:3px;margin-bottom:14px;border:1px solid var(--border);}
+    .ptab{flex:1;padding:8px 4px;border:none;background:transparent;border-radius:7px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;transition:all var(--tr);text-align:center;}
+    .ptab.active{background:var(--card);color:var(--accent);box-shadow:0 1px 4px rgba(0,0,0,.1);}
+    .ptab-content{display:none;}
+    .ptab-content.active{display:block;}
+
+    /* CODE BLOCK */
+    .code-block{background:#0f172a;color:#e2e8f0;border-radius:10px;padding:14px;font-family:'Courier New',monospace;font-size:12px;line-height:1.7;overflow-x:auto;position:relative;}
+    .code-copy{position:absolute;top:8px;right:8px;background:rgba(255,255,255,.1);border:none;color:#94a3b8;font-size:11px;padding:4px 8px;border-radius:5px;cursor:pointer;}
+    .code-copy:hover{background:rgba(255,255,255,.2);color:#fff;}
+    .step{display:flex;gap:10px;margin-bottom:10px;align-items:flex-start;}
+    .step-num{width:22px;height:22px;flex-shrink:0;background:var(--accent-l);color:var(--accent);border-radius:50%;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:1px;}
+    .step-text{font-size:13px;color:var(--text);line-height:1.5;}
+
+    /* LOG */
+    .log-list{display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto;}
+    .log-item{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:8px;background:var(--bg);font-size:12px;}
+    .log-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+    .log-dot.ok{background:var(--green);}
+    .log-dot.warn{background:var(--orange);}
+    .log-dot.err{background:var(--red);}
+    .log-time{color:var(--muted);white-space:nowrap;}
+    .log-msg{flex:1;color:var(--text);}
+    .log-empty{text-align:center;color:var(--muted);padding:20px;font-size:13px;}
+
+    /* ACTIONS */
+    .actions{margin-top:4px;display:flex;flex-direction:column;gap:8px;}
+    .btn-primary{width:100%;padding:16px;border:none;border-radius:12px;background:linear-gradient(135deg,var(--primary) 0%,var(--primary-l) 100%);color:#fff;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(26,60,110,.28);transition:opacity var(--tr),transform var(--tr);display:flex;align-items:center;justify-content:center;gap:7px;}
+    .btn-primary:active{opacity:.88;transform:scale(.98);}
+    .btn-row{display:flex;gap:8px;}
+    .btn-sec{flex:1;padding:12px;border:1.5px solid var(--border);border-radius:10px;background:var(--card);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:background var(--tr);}
+    .btn-sec:hover{background:var(--bg);}
+
+    /* COUNTDOWN */
+    .countdown{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--accent);letter-spacing:.5px;}
+
+    #importFile{display:none;}
+  </style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<div class="hdr">
+  <div class="hdr-in">
+    <div class="hdr-text">
+      <h1>ETF/ETN 모니터링</h1>
+      <p>Seibro 신규상장 자동 알림 · 클라우드 불필요</p>
+    </div>
+    <!-- 자동화 ON/OFF 토글 -->
+    <div class="auto-pill" id="autoPill" onclick="toggleAutomation()">
+      <div class="toggle-track" id="toggleTrack">
+        <div class="toggle-thumb"></div>
+      </div>
+      <span class="auto-pill-label" id="autoLabel">OFF</span>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- ── 상태 카드 ── -->
+  <div class="status-card">
+    <div class="st-item">
+      <span class="st-label">⏱ 다음 실행</span>
+      <span class="st-val dim" id="nextRunEl">자동화 꺼짐</span>
+    </div>
+    <div class="st-item">
+      <span class="st-label">📋 마지막 실행</span>
+      <span class="st-val dim" id="lastRunEl">기록 없음</span>
+    </div>
+    <div class="st-item" style="grid-column:1/-1;">
+      <span class="st-label">⌛ 남은 시간</span>
+      <div class="countdown" id="countdown">—</div>
+    </div>
+    <button class="run-now-btn" id="runNowBtn" onclick="runNow()">
+      ▶ 지금 즉시 실행 (브라우저)
+    </button>
+  </div>
+
+  <!-- ── 배너 ── -->
+  <div class="banner" id="banner"></div>
+
+  <!-- ── 1. 검색기간 ── -->
+  <div class="card">
+    <div class="card-title"><div class="ico">📅</div>신규상장 검색기간</div>
+
+    <div class="period-grid">
+      <div class="period-opt">
+        <input type="radio" name="period" id="p_today" value="today" checked>
+        <label for="p_today">
+          <span class="period-opt-title">당일</span>
+          <span class="period-opt-sub">오늘만 조회</span>
+        </label>
+      </div>
+      <div class="period-opt">
+        <input type="radio" name="period" id="p_past" value="past3">
+        <label for="p_past">
+          <span class="period-opt-title">당일포함 과거 3일</span>
+          <span class="period-opt-sub">오늘 기준 -2일 ~ 오늘</span>
+        </label>
+      </div>
+      <div class="period-opt">
+        <input type="radio" name="period" id="p_future" value="future3">
+        <label for="p_future">
+          <span class="period-opt-title">당일포함 미래 3일</span>
+          <span class="period-opt-sub">오늘 ~ +2일 (예정 포함)</span>
+        </label>
+      </div>
+      <div class="period-opt">
+        <input type="radio" name="period" id="p_custom" value="custom">
+        <label for="p_custom">
+          <span class="period-opt-title">직접 입력</span>
+          <span class="period-opt-sub">날짜 범위 직접 지정</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="custom-range" id="customRange">
+      <input type="date" id="customBegin">
+      <span>~</span>
+      <input type="date" id="customEnd">
+    </div>
+  </div>
+
+  <!-- ── 2. 발송시간 ── -->
+  <div class="card">
+    <div class="card-title"><div class="ico">⏰</div>이메일 발송시간</div>
+    <div class="field">
+      <label class="field-label">매 평일 자동 실행 시각</label>
+      <input type="time" id="sendTime" value="08:00">
+      <p class="field-hint">💡 장 시작(09:00) 전인 08:00 권장 · 탭이 열려있어야 브라우저 자동화 동작</p>
+    </div>
+  </div>
+
+  <!-- ── 3. 발송 이메일 ── -->
+  <div class="card">
+    <div class="card-title"><div class="ico">📧</div>발송 이메일</div>
+    <div class="field">
+      <label class="field-label">Gmail 발신 계정</label>
+      <input type="email" id="senderEmail" placeholder="example@gmail.com">
+    </div>
+    <div class="field">
+      <label class="field-label">Gmail 앱 비밀번호 <span style="font-weight:400;color:var(--muted)">(16자리)</span></label>
+      <input type="text" id="appPassword" placeholder="xxxx xxxx xxxx xxxx" maxlength="19" autocomplete="off" spellcheck="false">
+      <p class="field-hint">Google 계정 → 보안 → 앱 비밀번호 (2단계 인증 필요)</p>
+    </div>
+  </div>
+
+  <!-- ── 4. 수신 이메일 ── -->
+  <div class="card">
+    <div class="card-title"><div class="ico">📨</div>수신 이메일 <span style="font-weight:400;font-size:10px;margin-left:4px;">(복수 가능)</span></div>
+    <div class="rec-list" id="recList"></div>
+    <button class="btn-add" onclick="addRec()">+ 수신 주소 추가</button>
+  </div>
+
+  <!-- ── 실행 방식 (플랫폼별 설정) ── -->
+  <div class="card">
+    <div class="card-title"><div class="ico">🖥</div>자동화 설정 방법 (플랫폼 선택)</div>
+    <div class="ptabs" id="ptabs">
+      <button class="ptab active" onclick="switchTab('browser')">🌐 브라우저</button>
+      <button class="ptab" onclick="switchTab('mac')">🍎 Mac</button>
+      <button class="ptab" onclick="switchTab('win')">🪟 Windows</button>
+      <button class="ptab" onclick="switchTab('mobile')">📱 모바일</button>
+    </div>
+
+    <!-- 브라우저 탭 -->
+    <div class="ptab-content active" id="tab-browser">
+      <div class="step"><div class="step-num">1</div><div class="step-text">위의 <b>자동화 ON/OFF 토글</b>을 켜세요.</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">이 탭을 <b>열어 둔 상태로 유지</b>하면 설정한 시각에 자동으로 Seibro API를 조회합니다.</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">브라우저 모드는 <b>알림(Notification)</b>으로 결과를 안내합니다. 이메일 발송은 Python 스크립트 방식을 이용하세요.</div></div>
+      <div style="margin-top:10px;padding:10px 12px;background:var(--orange-l);border-radius:8px;font-size:12px;color:#78350f;">
+        ⚠️ Mac/Windows 스크립트 방식과 달리, 이 탭이 닫히면 자동화가 중단됩니다.
+      </div>
+    </div>
+
+    <!-- Mac 탭 -->
+    <div class="ptab-content" id="tab-mac">
+      <div class="step"><div class="step-num">1</div><div class="step-text">아래 파일을 <b>같은 폴더</b>에 준비: <code style="background:var(--bg);padding:1px 5px;border-radius:4px;">etf_etn_monitor.py</code>, <code style="background:var(--bg);padding:1px 5px;border-radius:4px;">config.json</code></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">터미널에서 실행:</div></div>
+      <div class="code-block" style="margin-bottom:10px;">
+        <button class="code-copy" onclick="copyCode(this)">복사</button>
+        <span style="color:#94a3b8"># 라이브러리 설치 (최초 1회)</span><br>
+        pip3 install requests<br><br>
+        <span style="color:#94a3b8"># cron 등록 (매 평일 08:00)</span><br>
+        (crontab -l 2>/dev/null; echo "0 8 * * 1-5 /usr/bin/python3 <b id="macPath">~/etf_etn_monitor.py</b> >> ~/etf_monitor.log 2>&1") | crontab -
+      </div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">등록 확인: <code style="background:var(--bg);padding:1px 5px;border-radius:4px;">crontab -l</code></div></div>
+    </div>
+
+    <!-- Windows 탭 -->
+    <div class="ptab-content" id="tab-win">
+      <div class="step"><div class="step-num">1</div><div class="step-text"><a href="#" onclick="downloadWindowsBat(event)" style="color:var(--accent);font-weight:700;">📥 setup_windows.bat 다운로드</a> 후 스크립트 폴더에 저장</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text"><b>관리자 권한으로</b> setup_windows.bat 실행 → Task Scheduler 자동 등록</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">작업 스케줄러 앱에서 "ETF_ETN_Monitor" 작업 확인</div></div>
+      <div class="code-block">
+        <button class="code-copy" onclick="copyCode(this)">복사</button>
+        <span style="color:#94a3b8">:: 수동으로 Task Scheduler 등록하는 명령어</span><br>
+        schtasks /create /tn "ETF_ETN_Monitor" ^<br>
+        &nbsp;/tr "python %USERPROFILE%\etf_etn_monitor.py" ^<br>
+        &nbsp;/sc WEEKLY /d MON,TUE,WED,THU,FRI ^<br>
+        &nbsp;/st <span id="winTime">08:00</span> /f
+      </div>
+    </div>
+
+    <!-- 모바일 탭 -->
+    <div class="ptab-content" id="tab-mobile">
+      <div class="step"><div class="step-num">1</div><div class="step-text">이 페이지를 <b>홈 화면에 추가</b>하세요 (Safari: 공유 → 홈 화면에 추가 / Chrome: 메뉴 → 홈 화면에 추가)</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">앱으로 열면 전체화면으로 사용 가능합니다.</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">위에서 <b>자동화 ON</b> → 시각이 되면 <b>브라우저 알림</b>이 옵니다. (탭이 열려 있어야 함)</div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text">이메일 발송은 <b>PC에서 Python 스크립트</b>를 cron/Task Scheduler로 돌리는 것을 권장합니다.</div></div>
+      <div style="margin-top:10px;padding:10px 12px;background:var(--green-l);border-radius:8px;font-size:12px;color:#064e3b;">
+        ✅ 이 어드민 페이지 자체는 Mac·Windows·모바일 모든 환경에서 사용 가능합니다.
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 실행 결과 로그 ── -->
+  <div class="card">
+    <div class="card-title" style="justify-content:space-between;">
+      <span style="display:flex;align-items:center;gap:8px;"><div class="ico">📊</div>실행 결과 로그</span>
+      <button onclick="clearLog()" style="background:none;border:none;font-size:11px;color:var(--muted);cursor:pointer;">초기화</button>
+    </div>
+    <div class="log-list" id="logList">
+      <div class="log-empty">아직 실행 기록이 없습니다.</div>
+    </div>
+  </div>
+
+  <!-- ── 액션 버튼 ── -->
+  <div class="actions">
+    <button class="btn-primary" onclick="saveConfig()">💾 설정 저장 및 config.json 내보내기</button>
+    <div class="btn-row">
+      <button class="btn-sec" onclick="document.getElementById('importFile').click()">📂 불러오기</button>
+      <button class="btn-sec" onclick="downloadWindowsBat(null)">🪟 Windows .bat</button>
+      <button class="btn-sec" onclick="resetAll()">🔄 초기화</button>
+    </div>
+  </div>
+  <input type="file" id="importFile" accept=".json" onchange="importConfig(event)">
+
+</div><!-- /wrap -->
+
+<script>
+// ═══════════════════════════════════════════════════
+//  상수
+// ═══════════════════════════════════════════════════
+const SEIBRO_KEY  = "814afc0ebba9a9e2d8e3530eb4da1c5fa1d980809bdf26fcfc82a46f0534cca3";
+const SEIBRO_URL  = "https://seibro.or.kr/OpenPlatform/callOpenAPI.jsp";  // HTTPS 직접 사용
+const PROXY_URLS  = [                                         // CORS 프록시 우선순위
+  "https://corsproxy.io/?",
+  "https://api.allorigins.win/raw?url=",
+];
+
+const INDEX_KW = [
+  "코스피","KOSPI","코스닥","KOSDAQ","KRX","코넥스","KONEX",
+  "200","100","150","50","300","지수","인덱스","INDEX",
+  "S&P","SP500","나스닥","NASDAQ","다우","DOW","러셀","RUSSELL",
+  "니케이","NIKKEI","항셍","항생","상해","CSI","DAX","유로",
+  "미국","중국","일본","유럽","글로벌","아시아","신흥",
+  "섹터","업종","반도체","바이오","헬스케어","2차전지","배터리",
+  "배당","고배당","성장","가치","모멘텀","퀄리티","우량",
+  "그린","친환경","ESG","클린","탄소","메타버스","클라우드",
+  "AI","인공지능","빅데이터","핀테크","게임","엔터","미디어","콘텐츠",
+  "금","은","구리","원유","천연가스","원자재","에너지",
+  "채권","국채","회사채",
+  "레버리지","인버스","곱버스","2X","3X",
+  "TOP","PLUS","MID","SMALL","LARGE"
+];
+
+// ═══════════════════════════════════════════════════
+//  상태
+// ═══════════════════════════════════════════════════
+let cfg = {
+  period:"today", customBegin:"", customEnd:"",
+  sendTime:"08:00",
+  senderEmail:"guardism@gmail.com", appPassword:"",
+  recipients:["guardism@gmail.com"],
+  automationOn: false
+};
+let logs = [];
+let automationTimer = null;
+let countdownTimer  = null;
+let nextRunDate     = null;
+
+// ═══════════════════════════════════════════════════
+//  초기화
+// ═══════════════════════════════════════════════════
+document.addEventListener("DOMContentLoaded", () => {
+  loadFromStorage();
+  renderAll();
+  bindPeriodChange();
+
+  // 알림 권한 요청
+  if ("Notification" in window && Notification.permission === "default") {
+    Notification.requestPermission();
+  }
+
+  // 자동화가 켜진 상태로 저장됐으면 복원
+  if (cfg.automationOn) scheduleAutomation();
+  else updateAutoUI(false);
+});
+
+// ═══════════════════════════════════════════════════
+//  Storage
+// ═══════════════════════════════════════════════════
+function loadFromStorage() {
+  try {
+    const s = localStorage.getItem("etf_cfg");
+    if (s) cfg = { ...cfg, ...JSON.parse(s) };
+    const l = localStorage.getItem("etf_logs");
+    if (l) logs = JSON.parse(l);
+  } catch(e) {}
+}
+function saveToStorage() {
+  localStorage.setItem("etf_cfg",  JSON.stringify(cfg));
+  localStorage.setItem("etf_logs", JSON.stringify(logs.slice(0, 50)));
+}
+
+// ═══════════════════════════════════════════════════
+//  UI 렌더
+// ═══════════════════════════════════════════════════
+function renderAll() {
+  // period
+  const radio = document.querySelector(`input[name=period][value="${cfg.period}"]`);
+  if (radio) radio.checked = true;
+  toggleCustomRange(cfg.period === "custom");
+  if (cfg.customBegin) document.getElementById("customBegin").value = cfg.customBegin;
+  if (cfg.customEnd)   document.getElementById("customEnd").value   = cfg.customEnd;
+
+  document.getElementById("sendTime").value    = cfg.sendTime    || "08:00";
+  document.getElementById("senderEmail").value = cfg.senderEmail || "";
+  document.getElementById("appPassword").value = cfg.appPassword || "";
+
+  renderRecs();
+  renderLogs();
+  updateAutoUI(cfg.automationOn);
+}
+
+function renderRecs() {
+  const list = document.getElementById("recList");
+  list.innerHTML = "";
+  const arr = cfg.recipients.length ? cfg.recipients : [""];
+  arr.forEach((e, i) => addRecRow(e, i));
+}
+
+function addRecRow(val, idx) {
+  const list = document.getElementById("recList");
+  const d = document.createElement("div");
+  d.className = "rec-item";
+  d.innerHTML = `
+    <input type="email" placeholder="recipient@email.com" value="${esc(val)}" oninput="onRecChange()">
+    <button class="btn-rm" onclick="rmRec(this)" title="삭제">✕</button>`;
+  list.appendChild(d);
+}
+
+function addRec() {
+  addRecRow("", document.getElementById("recList").children.length);
+  const ins = document.querySelectorAll("#recList input");
+  ins[ins.length-1].focus();
+}
+
+function rmRec(btn) {
+  const list = document.getElementById("recList");
+  if (list.children.length <= 1) { showBanner("최소 1개의 수신 이메일이 필요합니다.", "err"); return; }
+  btn.closest(".rec-item").remove();
+  onRecChange();
+}
+
+function onRecChange() { collectConfig(); }
+
+function renderLogs() {
+  const el = document.getElementById("logList");
+  if (!logs.length) { el.innerHTML = '<div class="log-empty">아직 실행 기록이 없습니다.</div>'; return; }
+  el.innerHTML = logs.slice(0,20).map(l =>
+    `<div class="log-item">
+      <div class="log-dot ${l.type}"></div>
+      <span class="log-time">${l.time}</span>
+      <span class="log-msg">${esc(l.msg)}</span>
+    </div>`).join("");
+}
+
+function clearLog() {
+  logs = [];
+  saveToStorage();
+  renderLogs();
+}
+
+// ═══════════════════════════════════════════════════
+//  Period 선택
+// ═══════════════════════════════════════════════════
+function bindPeriodChange() {
+  document.querySelectorAll("input[name=period]").forEach(r => {
+    r.addEventListener("change", () => {
+      toggleCustomRange(r.value === "custom");
+      collectConfig();
+    });
+  });
+}
+function toggleCustomRange(show) {
+  document.getElementById("customRange").classList.toggle("show", show);
+}
+
+// ═══════════════════════════════════════════════════
+//  Config 수집
+// ═══════════════════════════════════════════════════
+function collectConfig() {
+  const periodEl = document.querySelector("input[name=period]:checked");
+  cfg.period      = periodEl ? periodEl.value : "today";
+  cfg.customBegin = document.getElementById("customBegin").value;
+  cfg.customEnd   = document.getElementById("customEnd").value;
+  cfg.sendTime    = document.getElementById("sendTime").value;
+  cfg.senderEmail = document.getElementById("senderEmail").value.trim();
+  cfg.appPassword = document.getElementById("appPassword").value.trim();
+  cfg.recipients  = Array.from(document.querySelectorAll("#recList input"))
+                        .map(i=>i.value.trim()).filter(Boolean);
+  // Windows 커맨드 시각 업데이트
+  const wt = document.getElementById("winTime");
+  if (wt) wt.textContent = cfg.sendTime || "08:00";
+}
+
+// ═══════════════════════════════════════════════════
+//  날짜 계산 유틸
+// ═══════════════════════════════════════════════════
+function toYMD(d) {
+  return d.getFullYear()*10000 + (d.getMonth()+1)*100 + d.getDate();
+}
+function ymdStr(d) { return String(toYMD(d)).padStart(8,"0"); }
+function addDays(d, n) { const r=new Date(d); r.setDate(r.getDate()+n); return r; }
+
+function calcDateRange() {
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  switch(cfg.period) {
+    case "past3":   return { begin: ymdStr(addDays(today,-2)), end: ymdStr(today) };
+    case "future3": return { begin: ymdStr(today), end: ymdStr(addDays(today,2)) };
+    case "custom":
+      return {
+        begin: (cfg.customBegin||"").replace(/-/g,""),
+        end:   (cfg.customEnd  ||"").replace(/-/g,"")
+      };
+    default: /* today */
+      return { begin: ymdStr(today), end: ymdStr(today) };
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  Seibro API 호출 (CORS 프록시 경유)
+// ═══════════════════════════════════════════════════
+async function callSeibroAPI(begin, end) {
+  const target = `${SEIBRO_URL}?key=${SEIBRO_KEY}&apiId=getStkListInfo&params=ALT_BEGIN_DT:${begin},ALT_EXPRY_DT:${end}`;
+
+  let lastErr;
+  for (const proxy of PROXY_URLS) {
+    const url = proxy + encodeURIComponent(target);
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const text = await res.text();
+      // 프록시가 에러 JSON을 반환하는 경우 걸러냄
+      if (text.trim().startsWith("<")) return text;
+      throw new Error("비XML 응답: " + text.slice(0, 80));
+    } catch (e) {
+      lastErr = e;
+      console.warn(`프록시 실패 (${proxy}):`, e.message);
+    }
+  }
+  throw new Error("모든 프록시 실패: " + lastErr?.message);
+}
+
+// ═══════════════════════════════════════════════════
+//  XML 파싱
+// ═══════════════════════════════════════════════════
+function parseXML(xmlText) {
+  const parser = new DOMParser();
+  const doc    = parser.parseFromString(xmlText, "text/xml");
+
+  // 파서 오류 확인
+  const errNode = doc.querySelector("parsererror");
+  if (errNode) throw new Error("XML 파싱 오류: " + errNode.textContent.slice(0, 80));
+
+  // API 오류 코드 확인
+  const errCode = doc.querySelector("error");
+  if (errCode) {
+    const code    = errCode.getAttribute("code")    || errCode.querySelector("code")?.getAttribute("value")    || "";
+    const content = errCode.getAttribute("content") || errCode.querySelector("content")?.getAttribute("value") || "";
+    if (code && code !== "0" && code !== "00") throw new Error(`API 오류 ${code}: ${content}`);
+  }
+
+  // 1순위: 실제 Seibro 응답 구조 — vector > data > result > 필드(value 속성)
+  const resultElems = [...doc.querySelectorAll("data > result")];
+  if (resultElems.length) {
+    return resultElems.map(result => {
+      const obj = {};
+      for (const field of result.children) {
+        const val = field.getAttribute("value");
+        obj[field.tagName] = val !== null ? val : (field.textContent || "").trim();
+      }
+      return obj;
+    });
+  }
+
+  // 2순위: 텍스트 기반 구조 fallback
+  for (const tag of ["row", "item", "list", "record", "result"]) {
+    const rows = [...doc.querySelectorAll(tag)];
+    if (rows.length) {
+      return rows.map(row => {
+        const obj = {};
+        for (const child of row.children) {
+          const val = child.getAttribute("value");
+          obj[child.tagName] = val !== null ? val : (child.textContent || "").trim();
+        }
+        return obj;
+      });
+    }
+  }
+
+  return [];
+}
+
+// ═══════════════════════════════════════════════════
+//  ETF/ETN 판별
+// ═══════════════════════════════════════════════════
+function getProductType(s) {
+  // KOR_SECN_NM 우선, 하위 호환 필드 포함
+  const nameFields = ["KOR_SECN_NM","KR_NM","ISIN_NM","STK_NM","ITEM_NM","PRDT_NM"];
+  const name = nameFields.map(f => s[f] || "").find(v => v) || "";
+
+  if (name.toUpperCase().includes("ETF") || name.includes("상장지수투자신탁")) return "ETF";
+  if (name.toUpperCase().includes("ETN") || name.includes("상장지수증권"))    return "ETN";
+  return null;
+}
+
+function isSingleStock(s) {
+  // KOR_SECN_NM에 '단일' 포함 여부로 판별
+  const name = s["KOR_SECN_NM"] || "";
+  return name.includes("단일");
+}
+
+function getName(s) {
+  const nameFields = ["KOR_SECN_NM","KR_NM","ISIN_NM","STK_NM","ITEM_NM","PRDT_NM"];
+  return nameFields.map(f => s[f] || "").find(v => v) || "이름 없음";
+}
+
+// ═══════════════════════════════════════════════════
+//  모니터링 실행
+// ═══════════════════════════════════════════════════
+async function runMonitoring() {
+  collectConfig();
+  const { begin, end } = calcDateRange();
+
+  if (!begin || !end) { showBanner("날짜 범위를 확인하세요.", "err"); return; }
+
+  document.getElementById("runNowBtn").disabled = true;
+  document.getElementById("runNowBtn").textContent = "⏳ 조회 중...";
+
+  let logType = "ok", logMsg = "";
+
+  try {
+    const xml = await callSeibroAPI(begin, end);
+    const all  = parseXML(xml);
+
+    const etfEtn = all.filter(s => getProductType(s));
+    const single = etfEtn.filter(s => isSingleStock(s));
+
+    logMsg = `조회 ${begin}~${end} | 전체 ${all.length}개 | ETF/ETN ${etfEtn.length}개 | 단일종목형 ${single.length}개`;
+
+    if (single.length > 0) {
+      logType = "warn";
+      const names = single.map(getName).join(", ");
+      logMsg += ` → ${names}`;
+
+      // 브라우저 알림
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification(`📢 단일종목형 ETF/ETN ${single.length}개 신규상장`, {
+          body: names,
+          icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📢</text></svg>"
+        });
+      } else {
+        showBanner(`⚠️ 단일종목형 ETF/ETN 발견: ${names}`, "info");
+      }
+    } else {
+      showBanner("✅ 조회 완료. 단일종목형 ETF/ETN 신규상장 없음.", "ok");
+    }
+
+    document.getElementById("lastRunEl").textContent = now() + (single.length > 0 ? ` ⚠️ ${single.length}건` : " ✅");
+    document.getElementById("lastRunEl").className   = "st-val " + (single.length > 0 ? "warn" : "ok");
+
+  } catch(e) {
+    logType = "err";
+    logMsg  = `오류: ${e.message}`;
+    showBanner("❌ " + e.message, "err");
+    document.getElementById("lastRunEl").textContent = now() + " ❌";
+    document.getElementById("lastRunEl").className   = "st-val err";
+  }
+
+  // 로그 저장
+  logs.unshift({ time: now(), type: logType, msg: logMsg });
+  saveToStorage();
+  renderLogs();
+
+  document.getElementById("runNowBtn").disabled = false;
+  document.getElementById("runNowBtn").textContent = "▶ 지금 즉시 실행 (브라우저)";
+}
+
+async function runNow() { await runMonitoring(); }
+
+// ═══════════════════════════════════════════════════
+//  자동화 스케줄러
+// ═══════════════════════════════════════════════════
+function toggleAutomation() {
+  collectConfig();
+  cfg.automationOn = !cfg.automationOn;
+  saveToStorage();
+  if (cfg.automationOn) {
+    scheduleAutomation();
+    showBanner("✅ 자동화가 시작되었습니다.", "ok");
+  } else {
+    stopAutomation();
+    showBanner("자동화를 껐습니다.", "info");
+  }
+  updateAutoUI(cfg.automationOn);
+}
+
+function scheduleAutomation() {
+  if (automationTimer) clearTimeout(automationTimer);
+  if (countdownTimer)  clearInterval(countdownTimer);
+
+  collectConfig();
+  const [h, m]  = (cfg.sendTime || "08:00").split(":").map(Number);
+  const now_d   = new Date();
+  let next      = new Date(now_d.getFullYear(), now_d.getMonth(), now_d.getDate(), h, m, 0);
+
+  // 이미 지난 시각이면 내일로
+  if (next <= now_d) next.setDate(next.getDate() + 1);
+
+  // 주말 스킵
+  while (next.getDay() === 0 || next.getDay() === 6) next.setDate(next.getDate() + 1);
+
+  nextRunDate = next;
+  const delay = next - now_d;
+
+  document.getElementById("nextRunEl").textContent = fmtDate(next);
+  document.getElementById("nextRunEl").className   = "st-val ok";
+
+  // 카운트다운
+  countdownTimer = setInterval(() => {
+    const diff = nextRunDate - new Date();
+    if (diff <= 0) { clearInterval(countdownTimer); return; }
+    document.getElementById("countdown").textContent = fmtDuration(diff);
+  }, 1000);
+
+  automationTimer = setTimeout(async () => {
+    await runMonitoring();
+    scheduleAutomation(); // 재스케줄
+  }, delay);
+}
+
+function stopAutomation() {
+  if (automationTimer) { clearTimeout(automationTimer);  automationTimer = null; }
+  if (countdownTimer)  { clearInterval(countdownTimer);  countdownTimer  = null; }
+  nextRunDate = null;
+  document.getElementById("nextRunEl").textContent = "자동화 꺼짐";
+  document.getElementById("nextRunEl").className   = "st-val dim";
+  document.getElementById("countdown").textContent = "—";
+}
+
+function updateAutoUI(on) {
+  document.getElementById("toggleTrack").classList.toggle("on", on);
+  document.getElementById("autoLabel").textContent = on ? "ON" : "OFF";
+}
+
+// ═══════════════════════════════════════════════════
+//  저장 & 내보내기
+// ═══════════════════════════════════════════════════
+function saveConfig() {
+  collectConfig();
+  if (!cfg.senderEmail?.includes("@")) { showBanner("발송 이메일 주소를 올바르게 입력하세요.", "err"); return; }
+  if (!cfg.recipients.length)           { showBanner("수신 이메일을 최소 1개 입력하세요.", "err"); return; }
+
+  saveToStorage();
+
+  const out = {
+    _info: "etf_etn_monitor.py 설정 파일. 스크립트와 같은 폴더에 저장하세요.",
+    searchPeriod: cfg.period,
+    customBeginDate: cfg.customBegin || "",
+    customEndDate:   cfg.customEnd   || "",
+    sendTime:    cfg.sendTime,
+    senderEmail: cfg.senderEmail,
+    appPassword: cfg.appPassword,
+    recipients:  cfg.recipients,
+    updatedAt:   new Date().toISOString()
+  };
+
+  download("config.json", JSON.stringify(out, null, 2), "application/json");
+  showBanner("✅ 저장 완료! config.json을 스크립트 폴더에 넣어주세요.", "ok");
+}
+
+function importConfig(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const r = new FileReader();
+  r.onload = ev => {
+    try {
+      const d = JSON.parse(ev.target.result);
+      cfg = {
+        ...cfg,
+        period:      d.searchPeriod || "today",
+        customBegin: d.customBeginDate || "",
+        customEnd:   d.customEndDate   || "",
+        sendTime:    d.sendTime    || "08:00",
+        senderEmail: d.senderEmail || "",
+        appPassword: d.appPassword || "",
+        recipients:  d.recipients  || []
+      };
+      renderAll(); saveToStorage();
+      showBanner("✅ 설정 파일을 불러왔습니다.", "ok");
+    } catch { showBanner("❌ 파일 형식이 올바르지 않습니다.", "err"); }
+  };
+  r.readAsText(file);
+  e.target.value = "";
+}
+
+function resetAll() {
+  if (!confirm("모든 설정을 초기화할까요?")) return;
+  cfg = { period:"today", customBegin:"", customEnd:"", sendTime:"08:00",
+          senderEmail:"guardism@gmail.com", appPassword:"", recipients:["guardism@gmail.com"], automationOn:false };
+  logs = [];
+  stopAutomation();
+  renderAll(); saveToStorage();
+  showBanner("설정이 초기화되었습니다.", "info");
+}
+
+// ═══════════════════════════════════════════════════
+//  Windows .bat 생성
+// ═══════════════════════════════════════════════════
+function downloadWindowsBat(e) {
+  if (e) e.preventDefault();
+  collectConfig();
+  const t = cfg.sendTime || "08:00";
+  const bat = `@echo off
+REM ================================================
+REM  ETF/ETN 모니터링 - Windows Task Scheduler 설정
+REM  관리자 권한으로 실행하세요
+REM ================================================
+echo ETF/ETN 모니터 Task Scheduler 등록 중...
+
+schtasks /delete /tn "ETF_ETN_Monitor" /f 2>nul
+
+schtasks /create ^
+  /tn "ETF_ETN_Monitor" ^
+  /tr "python \\"%~dp0etf_etn_monitor.py\\"" ^
+  /sc WEEKLY ^
+  /d MON,TUE,WED,THU,FRI ^
+  /st ${t} ^
+  /f
+
+if %ERRORLEVEL%==0 (
+  echo.
+  echo [OK] 등록 완료! 매 평일 ${t}에 자동 실행됩니다.
+  echo      작업 스케줄러에서 "ETF_ETN_Monitor" 항목을 확인하세요.
+) else (
+  echo [ERROR] 등록 실패. 관리자 권한으로 다시 실행하세요.
+)
+pause`;
+  download("setup_windows.bat", bat, "text/plain");
+}
+
+// ═══════════════════════════════════════════════════
+//  플랫폼 탭 전환
+// ═══════════════════════════════════════════════════
+function switchTab(id) {
+  document.querySelectorAll(".ptab-content").forEach(c=>c.classList.remove("active"));
+  document.querySelectorAll(".ptab").forEach(b=>b.classList.remove("active"));
+  document.getElementById("tab-"+id).classList.add("active");
+  event.target.classList.add("active");
+}
+
+// ═══════════════════════════════════════════════════
+//  코드 복사
+// ═══════════════════════════════════════════════════
+function copyCode(btn) {
+  const block = btn.parentElement;
+  const text  = block.innerText.replace("복사","").trim();
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = "✅ 복사됨";
+    setTimeout(()=>btn.textContent="복사", 2000);
+  });
+}
+
+// ═══════════════════════════════════════════════════
+//  유틸
+// ═══════════════════════════════════════════════════
+let bannerTimer = null;
+function showBanner(msg, type) {
+  const el = document.getElementById("banner");
+  el.textContent = msg;
+  el.className   = `banner ${type} show`;
+  el.scrollIntoView({behavior:"smooth",block:"nearest"});
+  clearTimeout(bannerTimer);
+  bannerTimer = setTimeout(()=>el.classList.remove("show"), 5000);
+}
+
+function now() {
+  const d = new Date();
+  return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+}
+function fmtDate(d) {
+  return `${d.getMonth()+1}/${d.getDate()} (${["일","월","화","수","목","금","토"][d.getDay()]}) ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+}
+function fmtDuration(ms) {
+  const s = Math.floor(ms/1000);
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), ss = s%60;
+  return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(ss).padStart(2,"0")}`;
+}
+function download(filename, content, mime) {
+  const a = Object.assign(document.createElement("a"), {
+    href: URL.createObjectURL(new Blob([content], {type:mime})),
+    download: filename
+  });
+  a.click(); URL.revokeObjectURL(a.href);
+}
+function esc(s) {
+  return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+</script>
+</body>
+</html>
