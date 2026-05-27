@@ -271,11 +271,16 @@
 
     <!-- 브라우저 탭 -->
     <div class="ptab-content active" id="tab-browser">
-      <div class="step"><div class="step-num">1</div><div class="step-text">위의 <b>자동화 ON/OFF 토글</b>을 켜세요.</div></div>
-      <div class="step"><div class="step-num">2</div><div class="step-text">이 탭을 <b>열어 둔 상태로 유지</b>하면 설정한 시각에 자동으로 Seibro API를 조회합니다.</div></div>
-      <div class="step"><div class="step-num">3</div><div class="step-text">브라우저 모드는 <b>알림(Notification)</b>으로 결과를 안내합니다. 이메일 발송은 Python 스크립트 방식을 이용하세요.</div></div>
+      <div class="step"><div class="step-num">1</div><div class="step-text"><b>터미널</b>에서 로컬 프록시를 먼저 실행하세요 (CORS 우회용, 탭과 별도 유지):</div></div>
+      <div class="code-block" style="margin-bottom:10px;">
+        <button class="code-copy" onclick="copyCode(this)">복사</button>
+        python3 /Users/proschoi/Documents/Claude/single_ETP_noti/serve.py
+      </div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">위의 <b>자동화 ON/OFF 토글</b>을 켜세요.</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">이 탭을 <b>열어 둔 상태로 유지</b>하면 설정한 시각에 자동으로 Seibro API를 조회합니다.</div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text">브라우저 모드는 <b>알림(Notification)</b>으로 결과를 안내합니다. 이메일 발송은 Python 스크립트 방식을 이용하세요.</div></div>
       <div style="margin-top:10px;padding:10px 12px;background:var(--orange-l);border-radius:8px;font-size:12px;color:#78350f;">
-        ⚠️ Mac/Windows 스크립트 방식과 달리, 이 탭이 닫히면 자동화가 중단됩니다.
+        ⚠️ serve.py 미실행 시 공개 CORS 프록시를 대신 시도하나 불안정할 수 있습니다. Mac/Windows 스크립트 방식과 달리, 이 탭이 닫히면 자동화가 중단됩니다.
       </div>
     </div>
 
@@ -351,8 +356,9 @@
 const SEIBRO_KEY  = "814afc0ebba9a9e2d8e3530eb4da1c5fa1d980809bdf26fcfc82a46f0534cca3";
 const SEIBRO_URL  = "https://seibro.or.kr/OpenPlatform/callOpenAPI.jsp";  // HTTPS 직접 사용
 const PROXY_URLS  = [                                         // CORS 프록시 우선순위
-  "https://corsproxy.io/?",
-  "https://api.allorigins.win/raw?url=",
+  { prefix: "http://localhost:18080",              local: true            },  // serve.py (가장 안정적)
+  { prefix: "https://corsproxy.io/?",              encode: true           },
+  { prefix: "https://api.allorigins.win/raw?url=", encode: true           },
 ];
 
 const INDEX_KW = [
@@ -551,13 +557,24 @@ function calcDateRange() {
 //  Seibro API 호출 (CORS 프록시 경유)
 // ═══════════════════════════════════════════════════
 async function callSeibroAPI(begin, end) {
-  const target = `${SEIBRO_URL}?key=${SEIBRO_KEY}&apiId=getStkListInfo&params=ALT_BEGIN_DT:${begin},ALT_EXPRY_DT:${end}`;
+  const qs     = `key=${SEIBRO_KEY}&apiId=getStkListInfo&params=ALT_BEGIN_DT:${begin},ALT_EXPRY_DT:${end}`;
+  const path   = `/OpenPlatform/callOpenAPI.jsp?${qs}`;   // 로컬 프록시용 경로
+  const target = `${SEIBRO_URL}?${qs}`;                   // 공개 프록시용 전체 URL
 
   let lastErr;
   for (const proxy of PROXY_URLS) {
-    const url = proxy + encodeURIComponent(target);
+    let url;
+    if (proxy.local) {
+      url = proxy.prefix + path;                        // http://localhost:18080/OpenPlatform/...
+    } else if (proxy.encode) {
+      url = proxy.prefix + encodeURIComponent(target);  // https://corsproxy.io/?encoded
+    } else {
+      url = proxy.prefix + target;                      // https://proxy.example.com/https://seibro...
+    }
     try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
+      console.log(`프록시 시도: ${proxy.prefix}`);
+      const timeout = proxy.local ? 5000 : 40000;       // 로컬 미실행 시 빠르게 다음으로
+      const res = await fetch(url, { signal: AbortSignal.timeout(timeout) });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const text = await res.text();
       // 프록시가 에러 JSON을 반환하는 경우 걸러냄
@@ -565,7 +582,7 @@ async function callSeibroAPI(begin, end) {
       throw new Error("비XML 응답: " + text.slice(0, 80));
     } catch (e) {
       lastErr = e;
-      console.warn(`프록시 실패 (${proxy}):`, e.message);
+      console.warn(`프록시 실패 (${proxy.prefix}):`, e.message);
     }
   }
   throw new Error("모든 프록시 실패: " + lastErr?.message);
@@ -628,9 +645,11 @@ function getProductType(s) {
   // KOR_SECN_NM 우선, 하위 호환 필드 포함
   const nameFields = ["KOR_SECN_NM","KR_NM","ISIN_NM","STK_NM","ITEM_NM","PRDT_NM"];
   const name = nameFields.map(f => s[f] || "").find(v => v) || "";
+  // 공백 제거 버전으로도 체크 (예: "상장지수 투자신탁"처럼 띄어쓰기 편차 대응)
+  const nameNoSpace = name.replace(/\s+/g, "");
 
-  if (name.toUpperCase().includes("ETF") || name.includes("상장지수투자신탁")) return "ETF";
-  if (name.toUpperCase().includes("ETN") || name.includes("상장지수증권"))    return "ETN";
+  if (name.toUpperCase().includes("ETF") || nameNoSpace.includes("상장지수투자신탁")) return "ETF";
+  if (name.toUpperCase().includes("ETN") || nameNoSpace.includes("상장지수증권"))    return "ETN";
   return null;
 }
 

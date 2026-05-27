@@ -284,13 +284,15 @@ def get_product_type(stock: dict):
             break
 
     name_upper = name.upper()
+    # 공백을 제거한 버전으로도 체크 (예: "상장지수 투자신탁"처럼 띄어쓰기 편차 대응)
+    name_nospace = re.sub(r"\s+", "", name)
 
     # ETF 판별: "ETF" 또는 한국어 정식명칭 "상장지수투자신탁"
-    if "ETF" in name_upper or "상장지수투자신탁" in name:
+    if "ETF" in name_upper or "상장지수투자신탁" in name_nospace:
         return "ETF"
 
     # ETN 판별: "ETN" 또는 한국어 정식명칭 "상장지수증권"
-    if "ETN" in name_upper or "상장지수증권" in name:
+    if "ETN" in name_upper or "상장지수증권" in name_nospace:
         return "ETN"
 
     return None
