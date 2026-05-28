@@ -6,7 +6,7 @@ import os
 
 cfg = {
     "_info": "GitHub Actions에서 자동 생성",
-    "searchPeriod": "today",
+    "searchPeriod": "biz5",
     "senderEmail": os.environ["SENDER_EMAIL"],
     "appPassword": os.environ["APP_PASSWORD"],
     "recipients": [r.strip() for r in os.environ["RECIPIENTS"].split(",")],

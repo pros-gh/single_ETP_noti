@@ -191,18 +191,21 @@
     <div class="card-title"><div class="ico">📅</div>신규상장 검색기간</div>
 
     <div class="period-grid">
-      <div class="period-opt">
-        <input type="radio" name="period" id="p_today" value="today" checked>
-        <label for="p_today">
-          <span class="period-opt-title">당일</span>
-          <span class="period-opt-sub">오늘만 조회</span>
+      <div class="period-opt" style="grid-column:1/-1;">
+        <input type="radio" name="period" id="p_biz5" value="biz5" checked>
+        <label for="p_biz5" style="flex-direction:row;align-items:center;gap:10px;">
+          <span style="font-size:18px;">⭐</span>
+          <span>
+            <span class="period-opt-title">과거 2영업일 ~ 미래 2영업일</span>
+            <span class="period-opt-sub">당일 기준 앞뒤 2영업일 포함 조회 (권장)</span>
+          </span>
         </label>
       </div>
       <div class="period-opt">
-        <input type="radio" name="period" id="p_past" value="past3">
-        <label for="p_past">
-          <span class="period-opt-title">당일포함 과거 3일</span>
-          <span class="period-opt-sub">오늘 기준 -2일 ~ 오늘</span>
+        <input type="radio" name="period" id="p_today" value="today">
+        <label for="p_today">
+          <span class="period-opt-title">당일</span>
+          <span class="period-opt-sub">오늘만 조회</span>
         </label>
       </div>
       <div class="period-opt">
@@ -212,11 +215,14 @@
           <span class="period-opt-sub">오늘 ~ +2일 (예정 포함)</span>
         </label>
       </div>
-      <div class="period-opt">
+      <div class="period-opt" style="grid-column:1/-1;">
         <input type="radio" name="period" id="p_custom" value="custom">
-        <label for="p_custom">
-          <span class="period-opt-title">직접 입력</span>
-          <span class="period-opt-sub">날짜 범위 직접 지정</span>
+        <label for="p_custom" style="flex-direction:row;align-items:center;gap:10px;">
+          <span style="font-size:18px;">📅</span>
+          <span>
+            <span class="period-opt-title">직접 입력</span>
+            <span class="period-opt-sub">날짜 범위 직접 지정</span>
+          </span>
         </label>
       </div>
     </div>
@@ -536,11 +542,21 @@ function toYMD(d) {
 }
 function ymdStr(d) { return String(toYMD(d)).padStart(8,"0"); }
 function addDays(d, n) { const r=new Date(d); r.setDate(r.getDate()+n); return r; }
+function addBusinessDays(d, n) {
+  const step = n >= 0 ? 1 : -1;
+  let count = 0, cur = new Date(d);
+  while (count < Math.abs(n)) {
+    cur.setDate(cur.getDate() + step);
+    if (cur.getDay() !== 0 && cur.getDay() !== 6) count++;
+  }
+  return cur;
+}
 
 function calcDateRange() {
   const today = new Date();
   today.setHours(0,0,0,0);
   switch(cfg.period) {
+    case "biz5":    return { begin: ymdStr(addBusinessDays(today,-2)), end: ymdStr(addBusinessDays(today,2)) };
     case "past3":   return { begin: ymdStr(addDays(today,-2)), end: ymdStr(today) };
     case "future3": return { begin: ymdStr(today), end: ymdStr(addDays(today,2)) };
     case "custom":

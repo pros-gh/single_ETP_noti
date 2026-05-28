@@ -89,6 +89,18 @@ load_config()
 # ============================================================
 #  검색 날짜 범위 계산
 # ============================================================
+def add_business_days(dt: datetime, n: int) -> datetime:
+    """영업일(월~금) 기준으로 n일 후/전 날짜를 반환합니다."""
+    step = 1 if n >= 0 else -1
+    count = 0
+    current = dt
+    while count < abs(n):
+        current += timedelta(days=step)
+        if current.weekday() < 5:  # 월(0)~금(4)
+            count += 1
+    return current
+
+
 def calc_date_range(base_date: str) -> tuple[str, str]:
     """
     SEARCH_PERIOD 설정에 따라 조회 시작/종료 날짜를 반환합니다.
@@ -96,7 +108,10 @@ def calc_date_range(base_date: str) -> tuple[str, str]:
     반환: (begin_str, end_str) 모두 'YYYYMMDD'
     """
     dt = datetime.strptime(base_date, "%Y%m%d")
-    if SEARCH_PERIOD == "past3":
+    if SEARCH_PERIOD == "biz5":
+        begin = add_business_days(dt, -2)
+        end   = add_business_days(dt,  2)
+    elif SEARCH_PERIOD == "past3":
         begin = dt - timedelta(days=2)
         end   = dt
     elif SEARCH_PERIOD == "future3":
