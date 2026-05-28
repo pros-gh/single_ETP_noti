@@ -318,6 +318,43 @@ def is_single_stock_type(stock: dict, product_type: str) -> bool:
 # ============================================================
 #  이메일 발송
 # ============================================================
+def build_no_result_email_html(date_str: str, total: int, etf_etn: int) -> str:
+    """단일종목형 없을 때 발송하는 간단 HTML 이메일"""
+    date_formatted = f"{date_str[:4]}년 {date_str[4:6]}월 {date_str[6:]}일"
+    return f"""<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="UTF-8"></head>
+<body style="font-family:'Malgun Gothic',Arial,sans-serif;background:#f5f5f5;margin:0;padding:20px;">
+  <div style="max-width:700px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+    <div style="background:#1a3c6e;padding:24px 30px;">
+      <h1 style="color:#fff;margin:0;font-size:20px;">✅ 단일종목형 ETF/ETN 모니터링 결과</h1>
+      <p style="color:#aac4e8;margin:6px 0 0;font-size:14px;">{date_formatted}</p>
+    </div>
+    <div style="padding:28px 30px;text-align:center;">
+      <p style="font-size:16px;color:#333;margin:0 0 16px;">오늘 단일종목형 ETF/ETN 신규상장이 없습니다.</p>
+      <table style="margin:0 auto;border-collapse:collapse;font-size:14px;color:#555;">
+        <tr>
+          <td style="padding:8px 20px;border:1px solid #e0e0e0;background:#f9f9f9;">전체 신규상장</td>
+          <td style="padding:8px 20px;border:1px solid #e0e0e0;font-weight:bold;">{total}개</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 20px;border:1px solid #e0e0e0;background:#f9f9f9;">ETF/ETN</td>
+          <td style="padding:8px 20px;border:1px solid #e0e0e0;font-weight:bold;">{etf_etn}개</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 20px;border:1px solid #e0e0e0;background:#f9f9f9;">단일종목형 ETF/ETN</td>
+          <td style="padding:8px 20px;border:1px solid #e0e0e0;font-weight:bold;color:#10b981;">0개</td>
+        </tr>
+      </table>
+    </div>
+    <div style="padding:16px 30px;text-align:center;font-size:12px;color:#aaa;border-top:1px solid #eee;">
+      KSD Seibro 신규상장 모니터링 에이전트 • {date_formatted}
+    </div>
+  </div>
+</body>
+</html>"""
+
+
 def build_email_html(stocks: list[dict], date_str: str) -> str:
     """HTML 이메일 본문 생성"""
     date_formatted = f"{date_str[:4]}년 {date_str[4:6]}월 {date_str[6:]}일"
@@ -512,14 +549,16 @@ def main():
 
     logger.info(f"단일종목형 ETF/ETN: {len(single_stock_list)}개")
 
-    # 5. 알림 발송
+    # 5. 알림 발송 (결과 유무 관계없이 항상 발송)
+    date_fmt = f"{date_str[:4]}/{date_str[4:6]}/{date_str[6:]}"
     if single_stock_list:
-        date_fmt = f"{date_str[:4]}/{date_str[4:6]}/{date_str[6:]}"
         subject = f"[Seibro 알림] 단일종목형 ETF/ETN {len(single_stock_list)}개 신규상장 ({date_fmt})"
         html_body = build_email_html(single_stock_list, date_str)
-        send_gmail(subject, html_body)
     else:
-        logger.info("단일종목형 ETF/ETN 신규상장 없음. 이메일 미발송.")
+        subject = f"[Seibro 알림] 단일종목형 ETF/ETN 신규상장 없음 ({date_fmt})"
+        html_body = build_no_result_email_html(date_str, len(all_stocks), len(etf_etn_list))
+        logger.info("단일종목형 ETF/ETN 신규상장 없음. 결과 없음 이메일 발송.")
+    send_gmail(subject, html_body)
 
     logger.info("========== 모니터링 완료 ==========\n")
 
